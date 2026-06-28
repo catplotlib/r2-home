@@ -1,4 +1,4 @@
-# it-moves-sometimes
+# r2-home
 
 ![Robot demo](assets/robot-demo.gif)
 
