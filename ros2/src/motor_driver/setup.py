@@ -1,4 +1,6 @@
 from setuptools import find_packages, setup
+import os
+from glob import glob
 
 package_name = 'motor_driver'
 
@@ -10,7 +12,9 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
-    ],
+    (os.path.join('share', package_name, 'launch'), 
+ glob('launch/*.py')),
+        ],
     install_requires=['setuptools'],
     zip_safe=True,
     maintainer='puja',
@@ -25,6 +29,8 @@ setup(
     entry_points={
         'console_scripts': [
             'serial_drive_node = motor_driver.serial_drive_node:main',
+            'teleop_gui_node = motor_driver.teleop_gui_node:main',
+            'odom_monitor_node = motor_driver.odom_monitor_node:main',
         ],
     },
 )

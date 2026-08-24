@@ -1,18 +1,35 @@
+// Firmware for the differential-drive robot's Arduino.
+// Pairs with motor_driver/serial_drive_node.py (ROS 2).
+//
+// Serial protocol @ 9600 baud:
+//   Rx: "M <left> <right>"  set motor PWM (-255..255)
+//       "F/B/R/L <spd>"     forward/back/turn helpers
+//       "S"                 stop
+//       "X"                 zero encoder counts (reply "OK X")
+//   Tx: "E <enc1> <enc2> <rad1> <rad2>"  every 50 ms
+//
+// Encoders: 12 PPR hall x 2 (both edges of channel A) x 90:1 gearbox
+//           = 2160 counts per wheel revolution. Both channels now use true
+//           quadrature (readEnc1/readEnc2 read the B channel for direction).
+
 const int IN1 = 8;
 const int IN2 = 9;
 const int IN3 = 10;
 const int IN4 = 11;
-
+const int ENA = 5;
+const int ENB = 6;
 const int ENC1_A = 2;
 const int ENC1_B = 4;
 const int ENC2_A = 3;
 const int ENC2_B = 7;
 
-const float PPR1 = 180.0;
-const float PPR2 = 2281.0;
+const float PPR1 = 2161.0;
+const float PPR2 = 2161.0;
 
 volatile long enc1_count = 0;
 volatile long enc2_count = 0;
+
+bool motor2_forward = true;  // set by setB(); no longer used for counting
 
 String inputBuffer = "";
 
@@ -20,15 +37,13 @@ void setup() {
   Serial.begin(9600);
   pinMode(IN1, OUTPUT); pinMode(IN2, OUTPUT);
   pinMode(IN3, OUTPUT); pinMode(IN4, OUTPUT);
-
+  pinMode(ENA, OUTPUT); pinMode(ENB, OUTPUT);
   pinMode(ENC1_A, INPUT_PULLUP);
   pinMode(ENC1_B, INPUT_PULLUP);
   pinMode(ENC2_A, INPUT_PULLUP);
   pinMode(ENC2_B, INPUT_PULLUP);
-
   attachInterrupt(digitalPinToInterrupt(ENC1_A), readEnc1, CHANGE);
   attachInterrupt(digitalPinToInterrupt(ENC2_A), readEnc2, CHANGE);
-
   stopMotors();
   Serial.println("Ready");
 }
@@ -46,7 +61,6 @@ void loop() {
     }
   }
 
-  // publish encoder counts and radians every 50ms
   static unsigned long last_pub = 0;
   if (millis() - last_pub > 50) {
     float rad1 = (float)enc1_count / PPR1 * 2.0 * PI;
@@ -84,8 +98,8 @@ void handleCommand(String msg) {
     switch (cmd) {
       case 'F': forward(spd);   break;
       case 'B': backward(spd);  break;
-      case 'L': turnLeft(spd);  break;
-      case 'R': turnRight(spd); break;
+      case 'R': turnLeft(spd);  break;
+      case 'L': turnRight(spd); break;
       case 'S': stopMotors();   break;
     }
     Serial.print("OK "); Serial.println(cmd);
@@ -94,9 +108,9 @@ void handleCommand(String msg) {
 
 void readEnc1() {
   if (digitalRead(ENC1_B) == digitalRead(ENC1_A))
-    enc1_count++;
-  else
     enc1_count--;
+  else
+    enc1_count++;
 }
 
 void readEnc2() {
@@ -107,20 +121,29 @@ void readEnc2() {
 }
 
 void setA(int spd, bool fwd) {
+  spd = (int)(spd * 1.0);  // reduce left to match right
+  spd = constrain(spd, 0, 255);
   digitalWrite(IN1, fwd ? HIGH : LOW);
   digitalWrite(IN2, fwd ? LOW  : HIGH);
+  analogWrite(ENA, spd);
 }
 
 void setB(int spd, bool fwd) {
+  motor2_forward = fwd;
+  spd = constrain(spd, 0, 255);
   digitalWrite(IN3, fwd ? HIGH : LOW);
   digitalWrite(IN4, fwd ? LOW  : HIGH);
+  analogWrite(ENB, spd);
 }
 
 void forward(int spd)   { setA(spd, true);  setB(spd, true);  }
 void backward(int spd)  { setA(spd, false); setB(spd, false); }
 void turnLeft(int spd)  { setA(spd, false); setB(spd, true);  }
 void turnRight(int spd) { setA(spd, true);  setB(spd, false); }
+
 void stopMotors() {
+  analogWrite(ENA, 0);
+  analogWrite(ENB, 0);
   digitalWrite(IN1, LOW); digitalWrite(IN2, LOW);
   digitalWrite(IN3, LOW); digitalWrite(IN4, LOW);
 }

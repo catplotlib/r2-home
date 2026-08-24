@@ -1,6 +1,9 @@
 from launch import LaunchDescription
 from launch_ros.actions import Node
 from launch.actions import SetEnvironmentVariable
+from launch_ros.actions import Node
+from launch.actions import ExecuteProcess
+from launch.actions import TimerAction
 
 def generate_launch_description():
     return LaunchDescription([
@@ -31,4 +34,15 @@ def generate_launch_description():
             executable='display_node',
             name='display_node',
         ),
+        TimerAction(
+        period=5.0,
+        actions=[
+            Node(
+                package='slam_toolbox',
+                executable='async_slam_toolbox_node',
+                name='slam_toolbox',
+                parameters=['/home/puja/slam.yaml'],
+            ),
+        ]
+    ),
     ])

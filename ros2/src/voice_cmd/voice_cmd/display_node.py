@@ -1,11 +1,13 @@
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
+from std_msgs.msg import Bool
 import pygame
 import sys
 import math
+import time as time_module
 
-PINK = (255, 182, 193)
+PINK = (255, 100, 130)
 BG   = (15, 15, 25)
 
 class DisplayNode(Node):
@@ -13,6 +15,8 @@ class DisplayNode(Node):
         super().__init__('display_node')
         self.sub = self.create_subscription(
             Twist, '/cmd_vel', self.cmd_vel_callback, 10)
+        self.awake_sub = self.create_subscription(
+            Bool, '/robot_awake', self.awake_callback, 10)
 
         pygame.init()
         self.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
@@ -26,7 +30,12 @@ class DisplayNode(Node):
         self.blink_timer    = 0
         self.blink_frame    = 0
         self.is_blinking    = False
-        self.BLINK_INTERVAL = 180
+        self.BLINK_INTERVAL = 90
+
+        self.is_awake = False
+        self.glow_intensity = 0.0
+        self.glow_off_time = 0.0
+        self.glow_angle = 0.0
 
         self.last_cmd_time = self.get_clock().now()
         self.create_timer(0.033, self.update_display)
@@ -53,6 +62,11 @@ class DisplayNode(Node):
 
         self.last_cmd_time = self.get_clock().now()
 
+    def awake_callback(self, msg):
+        self.is_awake = msg.data
+        if msg.data:
+            self.glow_off_time = time_module.time() + 5.0
+
     def update_display(self):
         for event in pygame.event.get():
             if event.type == pygame.KEYDOWN and event.key == pygame.K_q:
@@ -77,29 +91,63 @@ class DisplayNode(Node):
                 self.blink_frame = 0
                 self.blink_timer = 0
 
+        glow_active = self.is_awake and time_module.time() < self.glow_off_time
+
+        if glow_active:
+            self.glow_intensity = min(1.0, self.glow_intensity + 0.08)
+            self.glow_angle += 0.12
+        else:
+            self.glow_intensity = max(0.0, self.glow_intensity - 0.04)
+
         self.draw()
 
+    def draw_glow_orbit(self, cx, cy, eye_r):
+        g = self.glow_intensity
+        if g < 0.01:
+            return
+
+        ring_r = eye_r + 20
+
+        # layered glow rings
+        for thickness, alpha_mul, color in [
+            (30, 0.15, (255, 80, 180)),
+            (14, 0.35, (255, 100, 200)),
+            (5,  0.9,  (255, 160, 220)),
+        ]:
+            surf = pygame.Surface((ring_r * 2 + 120, ring_r * 2 + 120), pygame.SRCALPHA)
+            sc = ring_r + 60
+            for t in range(thickness, 0, -1):
+                alpha = int(255 * g * alpha_mul * (1.0 - t / thickness))
+                pygame.draw.circle(surf, (*color, alpha), (sc, sc), ring_r + t, 2)
+            self.screen.blit(surf, (cx - sc, cy - sc))
+    
     def draw_eye(self, cx, cy, eye_r, pupil_r, iris_r, px, py, blink_frac):
+        self.draw_glow_orbit(cx, cy, eye_r)
+
         # white of eye
         pygame.draw.circle(self.screen, (230, 230, 230), (cx, cy), eye_r)
 
         if blink_frac < 1.0:
-            # iris
             pygame.draw.circle(self.screen, PINK, (px, py), iris_r)
-            # pupil
             pygame.draw.circle(self.screen, (10, 10, 10), (px, py), pupil_r)
-            # highlight
             pygame.draw.circle(self.screen, (255, 255, 255), (px + 18, py - 18), 12)
             pygame.draw.circle(self.screen, (255, 255, 255), (px + 28, py - 8), 6)
 
-        # eyelid blink
         eyelid_h = int(eye_r * 2 * blink_frac)
         if eyelid_h > 0:
             eyelid_rect = pygame.Rect(cx - eye_r, cy - eye_r, eye_r * 2, eyelid_h)
             pygame.draw.ellipse(self.screen, BG, eyelid_rect)
 
-        # outline ring
-        pygame.draw.circle(self.screen, PINK, (cx, cy), eye_r, 6)
+        if self.glow_intensity > 0.01:
+            g = self.glow_intensity
+            outline_color = (
+                min(255, int(180 + 75 * g)),
+                min(255, int(60 + 40 * g)),
+                min(255, int(90 + 50 * g))
+            )
+            pygame.draw.circle(self.screen, outline_color, (cx, cy), eye_r, 6)
+        else:
+            pygame.draw.circle(self.screen, PINK, (cx, cy), eye_r, 6)
 
     def draw(self):
         self.screen.fill(BG)
