@@ -2,11 +2,7 @@
 
 ![Robot demo](assets/robot-demo.gif)
 
-An ongoing scratch-built robot project: custom CAD, 3D printed parts, embedded control, and ROS2 integration.
-
-> **Work in Progress**
->
-> This repo documents the build as it happens. Some systems are stable, some are experimental, and a few are still held together by hope and zip ties.
+A scratch-built mobile robot: custom CAD, 3D printed parts, embedded control, and ROS2 integration.
 
 ## What This Project Is
 
@@ -21,28 +17,22 @@ The goal is a capable, autonomous mobile robot that can map and navigate real en
 
 ## Current Status
 
-Hardware and basic integration are behaving:
+Working today:
 
-- ✅ Pi is talking to Arduino
-- ✅ ROS2 sees the LiDAR
-- ✅ Wheel encoders are publishing usable data
-- ✅ Odometry is calibrated and published as `/odom` + `odom -> base_link` TF
-- ✅ Closed-loop wheel velocity control (feedforward + PI), so `cmd_vel` is real m/s
-- ✅ Voice control via Whisper + GPT intent parsing, with an animated face on the display
-- 🚧 SLAM bring-up with `slam_toolbox` (launched, still being tuned)
+- Pi and Arduino talking over a serial protocol
+- LiDAR integrated and publishing scans
+- Calibrated wheel odometry on `/odom`, with the `odom -> base_link` transform
+- Closed-loop wheel velocity control (feedforward + PI), so `cmd_vel` is real m/s
+- Voice control via Whisper transcription and GPT intent parsing
+- Animated face on the robot's display, driven by what it's doing
 
 ## What Is Next
 
-### Immediate
-
-- Tune the SLAM pipeline and record clean mapping runs
-- Validate odometry + LiDAR consistency over longer drives
-- Move the hard-coded config paths (`/home/puja/*.yaml`) into the repo's `config/`
-
-### In Progress
-
-- Wheel upgrade (current setup works, but needs better traction and reliability)
-- Voice recognition improvements (usable, but still rough)
+- Bring up `slam_toolbox` mapping and record map runs
+- Validate odometry against LiDAR over longer drives
+- Autonomous navigation with Nav2
+- Wheel upgrade for more traction
+- Move runtime config paths into `config/`
 
 ## Repository Layout
 
@@ -64,7 +54,3 @@ Hardware and basic integration are behaving:
 | `odom_monitor_node` | `/odom` | - |
 | `voice_cmd_node` | - | `/cmd_vel`, `/robot_awake` |
 | `display_node` | `/cmd_vel`, `/robot_awake` | - |
-
-## Notes
-
-This is not a finished platform yet, but it is moving in the right direction.
